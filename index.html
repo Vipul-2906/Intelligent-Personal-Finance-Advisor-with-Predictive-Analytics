@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Finance Advisor — Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="auth-body">
+  <div class="auth-container">
+    <div class="auth-box" id="loginBox">
+      <div class="logo">💰</div>
+      <h2>Welcome back</h2>
+      <p class="subtitle">Securely manage your finances</p>
+
+      <form id="loginForm" class="form-section" onsubmit="return false;">
+        <input id="loginEmail" type="email" placeholder="Email" />
+        <input id="loginPassword" type="password" placeholder="Password" />
+        <button class="btn-primary" type="submit" onclick="ui.login()">Login</button>
+      </form>
+
+      <div class="links" style="text-align:center;margin-top:12px">
+        <a onclick="document.getElementById('loginBox').classList.add('hidden'); document.getElementById('signupBox').classList.remove('hidden')">Create Account</a> |
+        <a onclick="document.getElementById('loginBox').classList.add('hidden'); document.getElementById('forgotBox').classList.remove('hidden')">Forgot?</a>
+      </div>
+    </div>
+
+    <div class="auth-box hidden" id="signupBox">
+      <div class="logo">💰</div>
+      <h2>Create account</h2>
+      <p class="subtitle">Start your money journey</p>
+
+      <form id="signupForm" class="form-section" onsubmit="return false;">
+        <input id="signupName" type="text" placeholder="Full name" />
+        <input id="signupEmail" type="email" placeholder="Email" />
+        <input id="signupPassword" type="password" placeholder="Password" />
+        <input id="signupPassword2" type="password" placeholder="Confirm password" />
+        <button class="btn-primary" type="submit" onclick="ui.signup()">Create Account</button>
+      </form>
+
+      <div class="links" style="text-align:center;margin-top:12px">
+        <a onclick="document.getElementById('signupBox').classList.add('hidden'); document.getElementById('loginBox').classList.remove('hidden')">Back to login</a>
+      </div>
+    </div>
+
+    <div class="auth-box hidden" id="forgotBox">
+      <div class="logo">💰</div>
+      <h2>Reset password</h2>
+      <p class="subtitle">We will help you recover access</p>
+
+      <div class="form-section">
+        <input id="resetEmail" type="email" placeholder="Registered email" />
+        <button class="btn-primary" onclick="ui.resetPassword()">Send Reset Link</button>
+      </div>
+
+      <div class="links" style="text-align:center;margin-top:12px">
+        <a onclick="document.getElementById('forgotBox').classList.add('hidden'); document.getElementById('loginBox').classList.remove('hidden')">Back</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer"></div>
+  <script src="main.js"></script>
+</body>
+</html>
