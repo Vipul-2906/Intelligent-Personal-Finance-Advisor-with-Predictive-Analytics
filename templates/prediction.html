@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Finance Advisor PRO — Predictions</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .pred-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0; }
+    @media(max-width:640px){ .pred-grid{grid-template-columns:1fr;} }
+
+    .pred-card { padding:22px;border-radius:16px;background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08); }
+    .pred-card h4 { font-size:.8rem;opacity:.6;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px; }
+    .pred-card .val { font-size:2rem;font-weight:800;margin:0; }
+    .pred-card .conf { font-size:.8rem;opacity:.5;margin-top:4px; }
+
+    .badge-achieved { color:#22c55e; }
+    .badge-risk     { color:#ef4444; }
+
+    .explain-box { margin-top:16px;padding:16px;border-radius:12px;
+      background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.15); }
+    .explain-box h5 { margin:0 0 8px;font-size:.85rem;opacity:.7; }
+    .explain-box ul { margin:0;padding-left:18px;line-height:1.8;font-size:.88rem; }
+
+    .fi-bar-row { display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.82rem; }
+    .fi-bar-row .fi-name { width:160px;flex-shrink:0;opacity:.7; }
+    .fi-bar-bg  { flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden; }
+    .fi-bar-fill{ height:100%;border-radius:4px;background:#6366f1;transition:width .8s ease; }
+    .fi-pct     { width:36px;text-align:right;opacity:.6;font-size:.75rem; }
+
+    .whatif-row { display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:flex-end; }
+    .whatif-row input { flex:1;min-width:140px;padding:10px 14px;border-radius:10px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+      color:#fff;font-size:1rem;outline:none; }
+    .whatif-row select { padding:10px 14px;border-radius:10px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+      color:#fff;font-size:1rem;outline:none; }
+
+    .whatif-result { margin-top:16px;padding:16px;border-radius:12px;
+      background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);display:none; }
+    .whatif-result h5 { margin:0 0 10px;color:#22c55e; }
+    .wi-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px; }
+    .wi-stat  { text-align:center;padding:12px;border-radius:10px;background:rgba(255,255,255,0.04); }
+    .wi-stat h6 { font-size:.72rem;opacity:.6;margin:0 0 4px; }
+    .wi-stat p  { font-size:1.1rem;font-weight:700;margin:0; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><h2>💰 Finance PRO</h2></div>
+    <nav><ul>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('budget_page') }}">Budget</a></li>
+      <li><a href="{{ url_for('transactions_page') }}">Transactions</a></li>
+      <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
+      <li class="active"><a href="{{ url_for('prediction_page') }}">Predictions</a></li>
+      <li><a href="{{ url_for('emergency_page') }}">Emergency Fund</a></li>
+      <li><a href="{{ url_for('chatbot_page') }}">AI Advisor</a></li>
+      <li><a href="{{ url_for('home') }}" onclick="ui.logout()">Logout</a></li>
+    </ul></nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <h1>🤖 AI Predictions</h1>
+      <p class="muted">ML-powered financial forecasts</p>
+    </header>
+
+    <div style="margin-bottom:16px">
+      <button class="btn-primary" onclick="runAll()">▶ Run AI Analysis</button>
+      <span id="runStatus" style="margin-left:12px;opacity:.6;font-size:.85rem"></span>
+    </div>
+
+    <!-- Prediction Cards -->
+    <div class="pred-grid">
+      <div class="pred-card">
+        <h4>Goal Achievement</h4>
+        <p class="val" id="goalVal">—</p>
+        <p class="conf" id="goalConf"></p>
+      </div>
+      <div class="pred-card">
+        <h4>Next Month Expense</h4>
+        <p class="val" id="expVal">—</p>
+        <p class="conf" id="expNote"></p>
+      </div>
+    </div>
+
+    <!-- Explanation Panel -->
+    <div class="chart-card" id="explainPanel" style="display:none">
+      <h3>🔍 Explainable AI — Why this prediction?</h3>
+
+      <div class="explain-box" id="goalExplain">
+        <h5>Goal Prediction Reasoning</h5>
+        <ul id="goalReasons"></ul>
+      </div>
+
+      <div class="explain-box" style="margin-top:12px" id="expExplain">
+        <h5>Expense Prediction Drivers</h5>
+        <ul id="expDrivers"></ul>
+      </div>
+
+      <div style="margin-top:20px">
+        <h4 style="margin-bottom:12px;font-size:.9rem;opacity:.7">Feature Importance (Goal Model)</h4>
+        <div id="fiChart"></div>
+      </div>
+    </div>
+
+    <!-- Historical Chart -->
+    <div class="chart-card" style="margin-top:16px">
+      <div class="chart-title"><h3>Expense Trend</h3><small class="muted">Actual vs Simple Projection</small></div>
+      <canvas id="predChart"></canvas>
+    </div>
+
+    <!-- What-If Analysis -->
+    <div class="chart-card" style="margin-top:16px">
+      <h3>🔮 What-If Analysis</h3>
+      <p class="muted" style="font-size:.85rem">Simulate how reducing a category affects your financial outlook.</p>
+      <div class="whatif-row">
+        <input id="wiAmount" type="number" placeholder="Reduce spending by (₹)" min="0"/>
+        <select id="wiCategory">
+          <option value="entertainment">Entertainment</option>
+          <option value="food">Food</option>
+          <option value="transport">Transport</option>
+          <option value="general">General</option>
+        </select>
+        <button class="btn-primary" onclick="runWhatIf()">Simulate</button>
+      </div>
+      <div class="whatif-result" id="wiResult">
+        <h5>📊 Simulation Result</h5>
+        <div class="wi-grid">
+          <div class="wi-stat"><h6>New Monthly Savings</h6><p id="wiSavings">—</p></div>
+          <div class="wi-stat"><h6>New Savings Rate</h6><p id="wiSr">—</p></div>
+          <div class="wi-stat"><h6>Goal Achievement</h6><p id="wiGoal">—</p></div>
+          <div class="wi-stat"><h6>New Health Score</h6><p id="wiHs">—</p></div>
+          <div class="wi-stat"><h6>Predicted Expense</h6><p id="wiExp">—</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toastContainer"></div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>
+const BASE = window.location.origin;
+let predChart = null;
+
+async function runAll() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) return;
+  const status = document.getElementById('runStatus');
+  status.textContent = '⏳ Analysing…';
+
+  try {
+    const [gr, er, exr, hr] = await Promise.all([
+      fetch(`${BASE}/predict_goal`,    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:user.id})}),
+      fetch(`${BASE}/predict_expense`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:user.id})}),
+      fetch(`${BASE}/explain_prediction`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:user.id})}),
+      fetch(`${BASE}/predictions?user_id=${user.id}`),
+    ]);
+    const gd = await gr.json();
+    const ed = await er.json();
+    const xd = await exr.json();
+    const hd = await hr.json();
+
+    // Goal card
+    if (gd.status === 'success') {
+      const gv = document.getElementById('goalVal');
+      gv.textContent = gd.goal_achieved ? '✅ On Track' : '⚠️ At Risk';
+      gv.className = 'val ' + (gd.goal_achieved ? 'badge-achieved' : 'badge-risk');
+      document.getElementById('goalConf').textContent = `Confidence: ${gd.confidence}%`;
+    } else {
+      document.getElementById('goalVal').textContent = gd.message || 'Error';
+    }
+
+    // Expense card
+    if (ed.status === 'success') {
+      document.getElementById('expVal').textContent = '₹' + (ed.next_month_expense||0).toLocaleString('en-IN');
+      document.getElementById('expNote').textContent = 'ML predicted next month total';
+    }
+
+    // Explain panel
+    if (xd.status === 'success') {
+      document.getElementById('explainPanel').style.display = 'block';
+
+      const reasons = xd.goal?.explanation?.reasons || [];
+      const rl = document.getElementById('goalReasons');
+      rl.innerHTML = reasons.map(r => `<li>${r}</li>`).join('') || '<li>Profile looks healthy.</li>';
+
+      const drivers = xd.expense?.explanation?.drivers || [];
+      const dl = document.getElementById('expDrivers');
+      dl.innerHTML = drivers.map(d => `<li>${d}</li>`).join('') || '<li>Spending pattern is stable.</li>';
+
+      // Feature importance bars
+      const fi = xd.goal?.explanation?.feature_importances || {};
+      const sorted = Object.entries(fi).sort((a,b) => b[1]-a[1]).slice(0,6);
+      const fiDiv = document.getElementById('fiChart');
+      fiDiv.innerHTML = '';
+      sorted.forEach(([name, val]) => {
+        const pct = Math.round(val * 100);
+        fiDiv.innerHTML += `
+          <div class="fi-bar-row">
+            <div class="fi-name">${name.replace(/_/g,' ')}</div>
+            <div class="fi-bar-bg"><div class="fi-bar-fill" style="width:${pct}%"></div></div>
+            <div class="fi-pct">${pct}%</div>
+          </div>`;
+      });
+    }
+
+    // Historical chart
+    if (hd.status === 'success') renderPredChart(hd.labels, hd.actual, hd.predicted);
+
+    status.textContent = '✅ Analysis complete';
+  } catch(e) {
+    status.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+async function runWhatIf() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) return;
+  const amount   = parseFloat(document.getElementById('wiAmount').value) || 0;
+  const category = document.getElementById('wiCategory').value;
+  const r = await fetch(`${BASE}/whatif`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({user_id:user.id, reduce_by:amount, category})
+  });
+  const d = await r.json();
+  if (d.status !== 'success') { alert(d.message || 'Error'); return; }
+  const s = d.scenario;
+  document.getElementById('wiResult').style.display = 'block';
+  document.getElementById('wiSavings').textContent = '₹' + (s.new_monthly_savings||0).toLocaleString('en-IN');
+  document.getElementById('wiSr').textContent      = (s.new_savings_rate*100).toFixed(1) + '%';
+  document.getElementById('wiGoal').textContent    = s.goal_prediction.goal_achieved ? '✅ On Track' : '⚠️ At Risk';
+  document.getElementById('wiHs').textContent      = s.new_health_score.score + '/100';
+  document.getElementById('wiExp').textContent     = '₹' + (s.predicted_next_expense||0).toLocaleString('en-IN');
+}
+
+function renderPredChart(labels, actual, predicted) {
+  const ctx = document.getElementById('predChart').getContext('2d');
+  if (predChart) predChart.destroy();
+  predChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'Actual',data:actual,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.12)',tension:.3,fill:true},
+        {label:'Projected',data:predicted,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',borderDash:[5,5],tension:.3,fill:false},
+      ]
+    },
+    options:{
+      plugins:{legend:{labels:{color:'#fff'}}},
+      scales:{
+        x:{ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{ticks:{color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'}},
+      }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Auto-run on load for convenience
+
+});
+</script>
+</body>
+</html>

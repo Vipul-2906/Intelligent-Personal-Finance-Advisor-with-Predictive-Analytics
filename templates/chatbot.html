@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Finance Advisor PRO — AI Advisor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <style>
+    .chat-wrap   { display:flex;flex-direction:column;height:calc(100vh - 140px);max-height:700px; }
+    .chat-log    { flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px; }
+    .chat-input  { display:flex !important;align-items:flex-end !important;gap:10px;padding:16px 20px;
+      border-top:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02); }
+    .chat-input textarea {
+      flex:1 !important;width:auto !important;padding:14px 18px !important;border-radius:16px !important;
+      resize:none !important;min-height:52px;max-height:140px;
+      background:rgba(255,255,255,0.08) !important;border:1.5px solid rgba(99,102,241,0.3) !important;
+      color:#fff !important;font-size:1rem !important;outline:none !important;
+      font-family:inherit !important;line-height:1.55 !important;
+      transition:border-color .2s,background .2s;overflow-y:auto;box-sizing:border-box;
+    }
+    .chat-input textarea:focus {
+      border-color:rgba(99,102,241,0.75) !important;background:rgba(255,255,255,0.11) !important;
+      box-shadow:0 0 0 3px rgba(99,102,241,0.15) !important;
+    }
+    .chat-input textarea::placeholder { color:rgba(255,255,255,0.35); }
+    .chat-input .btn-primary {
+      width:auto !important;flex-shrink:0 !important;padding:0 24px !important;
+      border-radius:14px !important;height:52px !important;white-space:nowrap !important;
+      font-size:.97rem !important;
+    }
+
+    .msg         { max-width:75%;padding:12px 16px;border-radius:14px;line-height:1.55;font-size:.9rem;white-space:pre-wrap; }
+    .msg.user    { align-self:flex-end;background:#6366f1;color:#fff;border-bottom-right-radius:4px; }
+    .msg.bot     { align-self:flex-start;background:rgba(255,255,255,0.07);border-bottom-left-radius:4px; }
+    .msg.bot.typing { opacity:.5;font-style:italic; }
+
+    .suggestions { display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0; }
+    .sug-btn { padding:6px 14px;border-radius:999px;font-size:.8rem;cursor:pointer;
+      background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;
+      transition:background .2s; }
+    .sug-btn:hover { background:rgba(99,102,241,0.28); }
+
+    .chat-header-info { font-size:.78rem;opacity:.5;padding:4px 16px;text-align:center; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><h2>💰 Finance PRO</h2></div>
+    <nav><ul>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('budget_page') }}">Budget</a></li>
+      <li><a href="{{ url_for('transactions_page') }}">Transactions</a></li>
+      <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
+      <li><a href="{{ url_for('prediction_page') }}">Predictions</a></li>
+      <li><a href="{{ url_for('emergency_page') }}">Emergency Fund</a></li>
+      <li class="active"><a href="{{ url_for('chatbot_page') }}">AI Advisor</a></li>
+      <li><a href="{{ url_for('home') }}" onclick="ui.logout()">Logout</a></li>
+    </ul></nav>
+  </aside>
+
+  <main class="main-content" style="padding:0;display:flex;flex-direction:column;">
+    <header class="topbar" style="padding:16px 24px">
+      <div><h1>🤖 AI Financial Advisor</h1><p class="muted">Ask me anything about your finances</p></div>
+    </header>
+
+    <div class="chat-header-info">Your financial data is analysed in real-time for personalised advice</div>
+
+    <!-- Quick suggestions -->
+    <div class="suggestions" id="suggestions">
+      <button class="sug-btn" onclick="sendSuggestion('Will I achieve my goal?')">Will I achieve my goal?</button>
+      <button class="sug-btn" onclick="sendSuggestion('How can I save more?')">How can I save more?</button>
+      <button class="sug-btn" onclick="sendSuggestion('What is my financial health score?')">Health score</button>
+      <button class="sug-btn" onclick="sendSuggestion('Predict my next month expenses')">Next month forecast</button>
+      <button class="sug-btn" onclick="sendSuggestion('What is my emergency fund status?')">Emergency fund</button>
+      <button class="sug-btn" onclick="sendSuggestion('Give me a financial summary')">Full summary</button>
+      <button class="sug-btn" onclick="sendSuggestion('What if I reduce entertainment by 2000?')">What-if analysis</button>
+    </div>
+
+    <div class="chart-card" style="flex:1;display:flex;flex-direction:column;margin:12px 24px 24px;overflow:hidden">
+      <div class="chat-log" id="chatLog">
+        <div class="msg bot">👋 Hello! I'm your AI Financial Advisor. I have access to your real financial data and ML predictions. Ask me anything — goal tracking, savings tips, expense forecasts, or spending analysis.</div>
+      </div>
+      <div class="chat-input">
+        <textarea id="msgInput" placeholder="Ask your financial question…" onkeydown="handleKey(event)" oninput="autoResize(this)" rows="1"></textarea>
+        <button class="btn-primary" onclick="sendMessage()">Send ➤</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toastContainer"></div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>
+const BASE = window.location.origin;
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function sendSuggestion(text) {
+  document.getElementById('msgInput').value = text;
+  sendMessage();
+}
+
+function appendMsg(text, role) {
+  const log  = document.getElementById('chatLog');
+  const div  = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+async function sendMessage() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) { alert('Please login first'); return; }
+  const input = document.getElementById('msgInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  appendMsg(msg, 'user');
+
+  const typing = appendMsg('Thinking…', 'bot typing');
+
+  try {
+    const r = await fetch(`${BASE}/chat`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id: user.id, message: msg})
+    });
+    const d = await r.json();
+    typing.remove();
+    appendMsg(d.status === 'success' ? d.response : ('❌ ' + (d.message || 'Error')), 'bot');
+  } catch(e) {
+    typing.remove();
+    appendMsg('❌ Network error. Make sure the backend is running.', 'bot');
+  }
+}
+</script>
+</body>
+</html>

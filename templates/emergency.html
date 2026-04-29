@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Finance Advisor PRO — Emergency Fund</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <style>
+    .ef-hero { text-align:center;padding:32px 0 16px; }
+    .ef-hero .ef-amount { font-size:2.8rem;font-weight:800;letter-spacing:-1px; }
+    .ef-hero .ef-sub { font-size:.95rem;opacity:.6;margin-top:4px; }
+    .ef-progress-wrap { margin:24px 0; }
+    .ef-bar-bg { background:rgba(255,255,255,0.08);border-radius:12px;height:20px;overflow:hidden; }
+    .ef-bar-fill { height:100%;border-radius:12px;transition:width 1s ease;background:#22c55e; }
+    .ef-bar-fill.high   { background:#ef4444; }
+    .ef-bar-fill.medium { background:#f59e0b; }
+    .ef-bar-fill.safe   { background:#22c55e; }
+    .ef-risk-badge { display:inline-block;padding:6px 18px;border-radius:999px;
+      font-weight:700;font-size:.9rem;margin-top:12px; }
+    .ef-risk-badge.high   { background:rgba(239,68,68,.15);color:#ef4444; }
+    .ef-risk-badge.medium { background:rgba(245,158,11,.15);color:#f59e0b; }
+    .ef-risk-badge.safe   { background:rgba(34,197,94,.15);color:#22c55e; }
+
+    .ef-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px; }
+    @media(max-width:600px){ .ef-grid{grid-template-columns:1fr;} }
+
+    .ef-stat { padding:20px;border-radius:14px;background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08); }
+    .ef-stat h5 { font-size:.78rem;opacity:.6;margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em; }
+    .ef-stat p  { font-size:1.4rem;font-weight:700;margin:0; }
+
+    .add-savings-form { margin-top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap; }
+    .add-savings-form input { flex:1;min-width:160px;padding:10px 14px;border-radius:10px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+      color:#fff;font-size:1rem;outline:none; }
+
+    .tips-list { margin-top:8px;padding-left:18px;opacity:.8;line-height:1.8; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><h2>💰 Finance PRO</h2></div>
+    <nav><ul>
+      <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('budget_page') }}">Budget</a></li>
+      <li><a href="{{ url_for('transactions_page') }}">Transactions</a></li>
+      <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
+      <li><a href="{{ url_for('prediction_page') }}">Predictions</a></li>
+      <li class="active"><a href="{{ url_for('emergency_page') }}">Emergency Fund</a></li>
+      <li><a href="{{ url_for('chatbot_page') }}">AI Advisor</a></li>
+      <li><a href="{{ url_for('home') }}" onclick="ui.logout()">Logout</a></li>
+    </ul></nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div><h1>🛡️ Emergency Fund</h1><p class="muted">Your financial safety net</p></div>
+    </header>
+
+    <div class="chart-card">
+      <div class="ef-hero">
+        <div class="ef-amount" id="efCurrent">₹0</div>
+        <div class="ef-sub">saved of <span id="efRequired">₹0</span> target (6 months of expenses)</div>
+      </div>
+
+      <div class="ef-progress-wrap">
+        <div class="ef-bar-bg">
+          <div class="ef-bar-fill" id="efBarFill" style="width:0%"></div>
+        </div>
+        <div style="text-align:center;margin-top:10px">
+          <span class="ef-risk-badge" id="efRiskBadge">—</span>
+          <span style="margin-left:12px;opacity:.7;font-size:.9rem" id="efPct">0%</span>
+        </div>
+      </div>
+
+      <div class="ef-grid">
+        <div class="ef-stat"><h5>Current Savings</h5><p id="statCurr">₹0</p></div>
+        <div class="ef-stat"><h5>Target (6 months)</h5><p id="statReq">₹0</p></div>
+        <div class="ef-stat"><h5>Still Needed</h5><p id="statNeeded">₹0</p></div>
+        <div class="ef-stat"><h5>Risk Level</h5><p id="statRisk">—</p></div>
+      </div>
+
+      <div class="add-savings-form">
+        <input id="addAmount" type="number" placeholder="Add to emergency fund (₹)" min="1"/>
+        <button class="btn-primary" onclick="addSavings()">➕ Add Savings</button>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-top:16px">
+      <h3>💡 Why Build an Emergency Fund?</h3>
+      <ul class="tips-list">
+        <li>Covers 3–6 months of living expenses if you lose your job or face an unexpected crisis.</li>
+        <li>Prevents you from going into debt for emergencies.</li>
+        <li>Provides peace of mind and financial resilience.</li>
+        <li>Start small — even ₹500/month adds up to ₹6,000/year.</li>
+        <li>Keep it in a separate, liquid savings account.</li>
+      </ul>
+    </div>
+  </main>
+</div>
+
+<div id="toastContainer"></div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>
+const BASE = window.location.origin;
+
+async function loadEmergency() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) return;
+  const r = await fetch(`${BASE}/emergency_status?user_id=${user.id}`);
+  const d = await r.json();
+  if (d.status !== 'success') return;
+
+  const curr = d.current_savings;
+  const req  = d.required_fund;
+  const pct  = d.progress;
+  const risk = d.risk.toLowerCase().replace(' ', '');
+
+  document.getElementById('efCurrent').textContent = '₹' + curr.toLocaleString('en-IN');
+  document.getElementById('efRequired').textContent = '₹' + req.toLocaleString('en-IN');
+  document.getElementById('efPct').textContent = pct + '%';
+  document.getElementById('statCurr').textContent = '₹' + curr.toLocaleString('en-IN');
+  document.getElementById('statReq').textContent  = '₹' + req.toLocaleString('en-IN');
+  document.getElementById('statNeeded').textContent = '₹' + Math.max(0, req - curr).toLocaleString('en-IN');
+  document.getElementById('statRisk').textContent = d.risk;
+
+  const bar   = document.getElementById('efBarFill');
+  const badge = document.getElementById('efRiskBadge');
+  bar.style.width = Math.min(pct, 100) + '%';
+  bar.className = 'ef-bar-fill ' + (pct < 30 ? 'high' : pct < 70 ? 'medium' : 'safe');
+  badge.className = 'ef-risk-badge ' + (pct < 30 ? 'high' : pct < 70 ? 'medium' : 'safe');
+  badge.textContent = (pct < 30 ? '🔴 ' : pct < 70 ? '🟡 ' : '🟢 ') + d.risk;
+}
+
+async function addSavings() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) return;
+  const amt = parseFloat(document.getElementById('addAmount').value);
+  if (!amt || amt <= 0) { alert('Enter a valid amount'); return; }
+  const r = await fetch(`${BASE}/update_emergency_fund`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({user_id: user.id, amount: amt})
+  });
+  const d = await r.json();
+  if (d.status === 'success') {
+    document.getElementById('addAmount').value = '';
+    loadEmergency();
+  } else {
+    alert(d.message || 'Error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadEmergency);
+</script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Finance Advisor PRO — Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* ── Health Score Ring ── */
+    .health-ring-wrap { display:flex;align-items:center;gap:24px;flex-wrap:wrap; }
+    .health-ring { position:relative;width:110px;height:110px;flex-shrink:0; }
+    .health-ring svg { transform:rotate(-90deg); }
+    .health-ring .ring-bg { fill:none;stroke:rgba(255,255,255,0.08);stroke-width:10; }
+    .health-ring .ring-fill { fill:none;stroke-width:10;stroke-linecap:round;
+      stroke-dasharray:283;stroke-dashoffset:283;transition:stroke-dashoffset 1s ease; }
+    .health-ring .ring-text { position:absolute;inset:0;display:flex;flex-direction:column;
+      align-items:center;justify-content:center; }
+    .health-ring .ring-text .score { font-size:1.6rem;font-weight:700; }
+    .health-ring .ring-text .label { font-size:.7rem;opacity:.7;margin-top:2px; }
+
+    /* ── Insight Pills ── */
+    .insight-list { display:flex;flex-direction:column;gap:8px;margin-top:12px; }
+    .insight-pill { display:flex;align-items:flex-start;gap:10px;padding:10px 14px;
+      border-radius:10px;font-size:.85rem;line-height:1.4; }
+    .insight-pill.warning { background:rgba(239,68,68,.12);border-left:3px solid #ef4444; }
+    .insight-pill.success { background:rgba(34,197,94,.10);border-left:3px solid #22c55e; }
+    .insight-pill.info    { background:rgba(59,130,246,.10);border-left:3px solid #3b82f6; }
+
+    /* ── Prediction Summary Card ── */
+    .pred-summary { display:flex;gap:12px;flex-wrap:wrap;margin-top:16px; }
+    .pred-chip { flex:1;min-width:140px;padding:12px 16px;border-radius:12px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08); }
+    .pred-chip h5 { font-size:.75rem;opacity:.6;margin:0 0 4px; }
+    .pred-chip p  { font-size:1.1rem;font-weight:600;margin:0; }
+
+    /* ── Emergency bar colours ── */
+    .em-high   { --bar-color: #ef4444; }
+    .em-medium { --bar-color: #f59e0b; }
+    .em-safe   { --bar-color: #22c55e; }
+    .em-fill   { background:var(--bar-color, #3b82f6); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><h2>💰 Finance PRO</h2></div>
+    <nav><ul>
+      <li class="active"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+      <li><a href="{{ url_for('budget_page') }}">Budget</a></li>
+      <li><a href="{{ url_for('transactions_page') }}">Transactions</a></li>
+      <li><a href="{{ url_for('goals_page') }}">Goals</a></li>
+      <li><a href="{{ url_for('prediction_page') }}">Predictions</a></li>
+      <li><a href="{{ url_for('emergency_page') }}">Emergency Fund</a></li>
+      <li><a href="{{ url_for('chatbot_page') }}">AI Advisor</a></li>
+      <li><a href="{{ url_for('home') }}" onclick="ui.logout()">Logout</a></li>
+    </ul></nav>
+  </aside>
+
+  <main class="main-content">
+    <header class="topbar">
+      <div>
+        <h1>Welcome, <span id="userName">Guest</span></h1>
+        <p class="muted">Your intelligent finance overview</p>
+      </div>
+      <div class="top-actions">
+        <button class="chip" id="quickAddBtn">+ Add</button>
+      </div>
+    </header>
+
+    <!-- Summary Cards -->
+    <section class="cards" id="summaryCards">
+      <div class="card"><h4>Total Income</h4><p id="incomeCard">₹0</p></div>
+      <div class="card"><h4>Total Expenses</h4><p id="expenseCard">₹0</p></div>
+      <div class="card"><h4>Monthly Savings</h4><p id="saveCard">₹0</p></div>
+    </section>
+
+    <!-- Health Score + Insights -->
+    <section class="chart-section" style="margin-top:20px;">
+      <div class="chart-card" style="flex:1.2">
+        <div class="chart-title"><h3>Financial Health</h3><small class="muted">Your overall financial wellness</small></div>
+        <div class="health-ring-wrap">
+          <div class="health-ring" id="healthRingWrap">
+            <svg viewBox="0 0 100 100" width="110" height="110">
+              <circle class="ring-bg" cx="50" cy="50" r="45"/>
+              <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="45"/>
+            </svg>
+            <div class="ring-text">
+              <span class="score" id="healthScore">—</span>
+              <span class="label" id="healthLabel">Loading</span>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div class="insight-list" id="insightList">
+              <div class="insight-pill info">Loading insights…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="small-cards" style="min-width:200px">
+        <div class="mini-card"><h5>Active Goals</h5><p id="activeGoals">0</p></div>
+        <div class="mini-card"><h5>Budget Status</h5><p id="budgetAlerts">—</p></div>
+        <div class="mini-card" style="cursor:pointer" onclick="location.href='/emergency'">
+          <h5>Emergency Fund</h5>
+          <p id="efProgress">—</p>
+          <div style="background:rgba(255,255,255,0.08);border-radius:6px;height:6px;margin-top:6px">
+            <div id="efBar" style="height:6px;border-radius:6px;width:0%;transition:width .8s ease"></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- Prediction Summary -->
+    <section class="chart-card" style="margin-top:16px">
+      <div class="chart-title"><h3>AI Prediction Summary</h3></div>
+      <div class="pred-summary">
+        <div class="pred-chip"><h5>Goal Achievement</h5><p id="goalPred">—</p></div>
+        <div class="pred-chip"><h5>Next Month Forecast</h5><p id="expPred">—</p></div>
+        <div class="pred-chip"><h5>ML Confidence</h5><p id="predConf">—</p></div>
+      </div>
+      <button class="btn-primary" style="margin-top:16px" onclick="runPredictions()">🤖 Run AI Analysis</button>
+    </section>
+
+    <!-- Expense Chart -->
+    <section class="chart-card" style="margin-top:16px">
+      <div class="chart-title"><h3>Monthly Expenses</h3><small class="muted">Last 6 months</small></div>
+      <canvas id="expenseChart"></canvas>
+    </section>
+
+    <!-- Quick Add Modal -->
+    <div id="quickModal" class="hidden" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)">
+      <div style="background:#0b2134;padding:18px;border-radius:12px;width:320px;color:#fff">
+        <h4>Add Transaction</h4>
+        <input id="quickCat" placeholder="Category" style="width:100%;padding:8px;margin-top:8px;background:#0b2134;color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;outline:none"/>
+        <input id="quickAmt" type="number" placeholder="Amount" style="width:100%;padding:8px;margin-top:8px;background:#0b2134;color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;outline:none"/>
+        <input id="quickDate" type="date" style="width:100%;padding:8px;margin-top:8px;background:#0b2134;color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;outline:none"/>
+        <select id="quickType" style="width:100%;padding:8px;margin-top:8px;background:#0b2134;color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;outline:none">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button class="btn-primary" id="quickSave">Add</button>
+          <button class="btn-primary" id="quickClose">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toastContainer"></div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>
+const BASE = window.location.origin;
+let expChart = null;
+
+async function loadDashboard() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) return;
+  document.getElementById('userName').textContent = user.name || 'Guest';
+
+  try {
+    const r = await fetch(`${BASE}/dashboard_summary?user_id=${user.id}`);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+
+    // Summary cards
+    document.getElementById('incomeCard').textContent  = '₹' + (d.summary.income || 0).toLocaleString('en-IN');
+    document.getElementById('expenseCard').textContent = '₹' + (d.summary.expense || 0).toLocaleString('en-IN');
+    document.getElementById('saveCard').textContent    = '₹' + (d.summary.savings || 0).toLocaleString('en-IN');
+
+    // Health score
+    const hs = d.health_score;
+    document.getElementById('healthScore').textContent = hs.score;
+    document.getElementById('healthLabel').textContent  = hs.label;
+    const ring = document.getElementById('ringFill');
+    ring.style.stroke = hs.color;
+    const offset = 283 - (hs.score / 100) * 283;
+    setTimeout(() => ring.style.strokeDashoffset = offset, 100);
+
+    // Insights
+    const il = document.getElementById('insightList');
+    il.innerHTML = '';
+    (d.insights || []).forEach(ins => {
+      const div = document.createElement('div');
+      div.className = `insight-pill ${ins.type}`;
+      div.textContent = ins.message;
+      il.appendChild(div);
+    });
+
+    // Mini cards
+    document.getElementById('activeGoals').textContent = d.active_goals;
+    document.getElementById('budgetAlerts').textContent = d.budget_exceeded ? '🚨 Over budget' : '✅ On track';
+
+    // Emergency fund (from separate API)
+    loadEmergencyMini(user.id);
+
+    // Expense chart
+    const ec = d.expense_chart;
+    renderExpenseChart(ec.labels, ec.data);
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function loadEmergencyMini(userId) {
+  try {
+    const r = await fetch(`${BASE}/emergency_status?user_id=${userId}`);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    document.getElementById('efProgress').textContent = d.progress + '% — ' + d.risk;
+    const bar = document.getElementById('efBar');
+    bar.style.width = d.progress + '%';
+    bar.style.background = d.risk_color;
+  } catch(e) {}
+}
+
+async function runPredictions() {
+  const user = JSON.parse(localStorage.getItem('fa_user') || '{}');
+  if (!user.id) return;
+  document.getElementById('goalPred').textContent = '…';
+  document.getElementById('expPred').textContent  = '…';
+  document.getElementById('predConf').textContent = '…';
+  try {
+    const [gr, er] = await Promise.all([
+      fetch(`${BASE}/predict_goal`,    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:user.id})}),
+      fetch(`${BASE}/predict_expense`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:user.id})}),
+    ]);
+    const gd = await gr.json();
+    const ed = await er.json();
+
+    if (gd.status === 'success') {
+      document.getElementById('goalPred').textContent = gd.goal_achieved ? '✅ On Track' : '⚠️ At Risk';
+      document.getElementById('predConf').textContent = gd.confidence + '%';
+    } else {
+      document.getElementById('goalPred').textContent = gd.message || 'N/A';
+    }
+    if (ed.status === 'success') {
+      document.getElementById('expPred').textContent = '₹' + (ed.next_month_expense || 0).toLocaleString('en-IN');
+    }
+  } catch(e) {
+    document.getElementById('goalPred').textContent = 'Error';
+  }
+}
+
+function renderExpenseChart(labels, data) {
+  const ctx = document.getElementById('expenseChart').getContext('2d');
+  if (expChart) expChart.destroy();
+  expChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Expenses (₹)',
+        data,
+        backgroundColor: 'rgba(99,102,241,0.7)',
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: '#fff' } } },
+      scales: {
+        x: { ticks: { color: '#aaa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#aaa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+</body>
+</html>
